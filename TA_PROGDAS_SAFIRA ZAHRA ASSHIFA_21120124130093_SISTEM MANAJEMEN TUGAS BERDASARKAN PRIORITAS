@@ -1,0 +1,202 @@
+from datetime import datetime
+import tkinter as tk
+from tkinter import messagebox
+from queue import PriorityQueue
+
+# Kelas Tugas untuk menyimpan data tugas
+class Tugas:
+    def __init__(self, judul, deadline, kategori):
+        self.judul = judul
+        self.deadline = datetime.strptime(deadline, "%Y-%m-%d")
+        self.kategori = kategori
+
+    def __lt__(self, other):
+        return self.deadline < other.deadline
+
+# Kelas ToDoList untuk mengelola daftar tugas
+class ToDoList:
+    def __init__(self):
+        self.tasks= PriorityQueue()
+        self.undo_stack = []
+
+    def add_tugas(self, judul, deadline, kategori):
+        tugas = Tugas(judul, deadline, kategori)
+        self.tasks.put(tugas)
+        self.undo_stack.append(('add', tugas))
+
+    def selesaikan_tugas(self):
+        if not self.tasks.empty():
+            tugas = self.tasks.get()
+            self.undo_stack.append(('remove', tugas))
+            return tugas
+        return None
+
+    def undo(self):
+        if self.undo_stack:
+            action, tugas = self.undo_stack.pop()
+            if action == 'add':
+                self._remove_specific_tugas(tugas)
+            elif action == 'remove':
+                self.tasks.put(tugas)
+        else:
+            messagebox.showinfo("Info", "Tidak ada aksi yang dapat di-undo.")
+
+    def _remove_specific_tugas(self, tugas_to_remove):
+        temp_queue = PriorityQueue()
+        while not self.tasks.empty():
+            tugas = self.tasks.get()
+            if tugas != tugas_to_remove:
+                temp_queue.put(tugas)
+        self.tasks = temp_queue
+
+# GUI untuk aplikasi manajemen tugas
+
+# Jendela login
+class LoginApp:
+    def __init__(self, root):
+        root.title("Login")
+        root.geometry("500x300")
+        root.configure(bg="pink")
+
+        tk.Label(root, text="Login!", font=("Arial", 20, "bold"), bg="pink").pack(pady=10)
+        tk.Label(root, text="Username:", font=("Arial", 12), bg="pink").pack(pady=5)
+        self.username_entry = tk.Entry(root, font=("Arial", 12))
+        self.username_entry.pack(pady=5)
+
+        tk.Label(root, text="Password:", font=("Arial", 12), bg="pink").pack(pady=5)
+        self.password_entry = tk.Entry(root, font=("Arial", 12), show="*")
+        self.password_entry.pack(pady=5)
+        tk.Button(root, text="Login", command=self.login, font=("Arial", 12), bg="white").pack(pady=10)
+
+
+    def login(self):
+        username = self.username_entry.get()
+        password = self.password_entry.get()
+
+        if username == "Safira" and password == "12345678":  # Contoh validasi
+            messagebox.showinfo("Login", "Login berhasil!")
+            root.destroy()
+            main_app()
+        else:
+            messagebox.showerror("Login", "Username atau password salah.")
+
+        # Tombol login
+        login_button = tk.Button(root, text="login", command=self.undo_action, font=("Helvetica", 15))
+        login_button.place(x=300, y=500)
+
+
+class ToDoApp:
+    def __init__(self, root):
+        self.todo_list = ToDoList()
+        
+        root.title("Aplikasi Manajemen Tugas Berdasarkan Tanggal")
+        root.geometry("600x400")
+        root.configure(bg="pink")
+
+        tk.Label(root, text="Hello!", font=("Georgia", 30, "bold"), bg="pink").place(x=230, y=5)
+        tk.Label(root, text="Please insert your data :", font=("Comic Sans MS", 15, "bold"), bg="pink").place(x=180, y=60)
+
+        # memasukkan tugas
+        self.tugas_entry = tk.Entry(root, width=28, font=("Georgia", 13), bg='white')
+        self.tugas_entry.place(x=250, y=120, height=25)
+        tk.Label(root, bg='pink', text="Nama Tugas :", font=("Arial", 13)).place(x=50, y=120)
+
+        # Memasukkan deadline
+        self.tanggal_entry = tk.Entry(root, width=28, font=("Georgia", 13), bg='white')
+        self.tanggal_entry.place(x=250, y=170, height=25)
+        tk.Label(root, text="Tanggal (YYYY-MM-DD):", bg='pink', font=("Arial", 13)).place(x=50, y=170)
+
+        # Dropdown untuk kategori
+        self.kategori_var = tk.StringVar(root)
+        self.kategori_var.set("Pekerjaan")  # Default kategori
+        categories = ["Pekerjaan", "Belajar", "Pribadi"]
+        self.kategori_menu = tk.OptionMenu(root, self.kategori_var, *categories)
+        self.kategori_menu.place(x=60, y=220)
+
+
+        # Tombol tambah tugas
+        add_button = tk.Button(root, text="Tambah Tugas", command=self.add_tugas, font=("Helvetica", 13))
+        add_button.place(x=170, y=220)
+
+        # Tombol hapus tugas
+        remove_button = tk.Button(root, text="Selesaikan Tugas", command=self.selesaikan_tugas, font=("Helvetica", 13))
+        remove_button.place(x=380, y=220)
+
+        # Tombol undo
+        undo_button = tk.Button(root, text="Undo", command=self.undo_action, font=("Helvetica", 13))
+        undo_button.place(x=310, y=220)
+
+        # Tombol keluar
+        tk.Button(root, text="Keluar", command=root.destroy, font=("Helvetica", 10), bg="white", fg="black").place(x=5, y=5)
+
+        # Area tampilan tugas
+        self.tugas_listbox = tk.Listbox(root, width=40, height=4, bg='white', font=("Georgia", 15))
+        self.tugas_listbox.place(x=50, y=280)
+
+    def add_tugas(self):
+        judul = self.tugas_entry.get()
+        deadline = self.tanggal_entry.get()
+        kategori =self.kategori_var.get()
+
+        try:
+            datetime.strptime(deadline, "%Y-%m-%d")  # Validasi tanggal
+        except ValueError:
+            messagebox.showerror("Error", "Masukkan tanggal dengan format YYYY-MM-DD.")
+            return
+
+        if judul:
+            self.todo_list.add_tugas(judul, deadline, kategori)
+            self.update_tugas_list()
+            self.tugas_entry.delete(0, tk.END)
+            self.tanggal_entry.delete(0, tk.END)
+        else:
+            messagebox.showerror("Error", "Nama tugas tidak boleh kosong.")
+
+    def selesaikan_tugas(self):
+        tugas = self.todo_list.selesaikan_tugas()
+        if tugas:
+            messagebox.showinfo("Tugas Selesai", f"Tugas '{tugas.judul}' telah diselesaikan.")
+            self.update_tugas_list()
+        else:
+            messagebox.showinfo("Info", "Tidak ada tugas yang tersisa.")
+
+    def undo_action(self):
+        self.todo_list.undo()
+        self.update_tugas_list()
+
+    def update_tugas_list(self):
+        self.tugas_listbox.delete(0, tk.END)
+        temp_queue = PriorityQueue()
+        tasks = []
+
+        # Pisahkan tugas berdasarkan kategori
+        categories = {"Pekerjaan": [], "Belajar": [], "Pribadi": []}
+        
+        while not self.todo_list.tasks.empty():
+            tugas = self.todo_list.tasks.get()
+            tasks.append(tugas)
+            categories[tugas.kategori].append(tugas)
+            temp_queue.put(tugas)
+        
+        # Tampilkan tugas per kategori
+        for kategori in categories:
+            if categories[kategori]:
+                self.tugas_listbox.insert(tk.END, f"--- {kategori} ---")
+                for tugas in categories[kategori]:
+                    deadline = tugas.deadline.strftime("%Y-%m-%d")
+                    self.tugas_listbox.insert(tk.END, f"{tugas.judul} (Tanggal: {deadline})")
+        
+        self.todo_list.tasks = temp_queue
+
+
+def main_app():
+    main_root = tk.Tk()
+    ToDoApp(main_root)
+    root.resizable(False, False)
+    main_root.mainloop()
+
+if __name__ == "__main__":
+    root = tk.Tk()
+    LoginApp(root)
+    root.resizable(False, False)
+    root.mainloop()
